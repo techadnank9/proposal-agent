@@ -65,4 +65,42 @@ describe("ProposalAgent", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("submits when pressing enter in the URL field", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        proposal: {
+          intro: "Keyboard intro",
+          client_understanding: "Keyboard understanding",
+          problems: ["Problem A"],
+          solution: "Keyboard solution",
+          deliverables: ["Deliverable A"],
+          timeline: "7 days",
+          pricing: "$2,000",
+        },
+        insights: {
+          title: "Keyboard Co",
+          description: "Test company",
+          services: ["seo"],
+        },
+      }),
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProposalAgent />);
+
+    const input = screen.getByLabelText(/client website url/i);
+    await user.type(input, "https://keyboard.example{enter}");
+
+    await waitFor(() =>
+      expect(screen.getByText(/keyboard intro/i)).toBeInTheDocument(),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
 });

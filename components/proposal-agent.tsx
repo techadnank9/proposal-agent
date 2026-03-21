@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { FormEvent } from "react";
 import {
   ArrowUpRightIcon,
   CheckCircle2Icon,
@@ -109,6 +110,11 @@ export function ProposalAgent() {
     }
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await handleGenerate();
+  }
+
   return (
     <main className="min-h-screen px-5 py-8 md:px-8 md:py-10 lg:px-12">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-7">
@@ -146,25 +152,26 @@ export function ProposalAgent() {
 
         <section id="generator" className="w-full">
           <Card className="mx-auto w-full overflow-hidden rounded-[34px] border border-amber-900/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(251,245,236,0.98))] text-stone-900 shadow-[0_28px_120px_rgba(46,22,0,0.12)]">
-            <CardContent className="mx-auto grid w-full max-w-4xl gap-4 px-6 py-5 md:px-8">
+            <CardContent className="mx-auto w-full max-w-4xl px-6 py-5 md:px-8">
+              <form className="grid gap-4" onSubmit={handleSubmit}>
               <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end md:gap-4">
                 <div className="grid gap-2">
-                <label htmlFor="url" className="text-sm font-medium text-stone-700">
-                  Client website URL
-                </label>
-                <Input
-                  id="url"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://client.com"
-                  className="h-12 rounded-[18px] border-amber-900/10 bg-white px-4 text-stone-900 placeholder:text-stone-400 shadow-sm"
-                />
-              </div>
+                  <label htmlFor="url" className="text-sm font-medium text-stone-700">
+                    Client website URL
+                  </label>
+                  <Input
+                    id="url"
+                    value={url}
+                    onChange={(event) => setUrl(event.target.value)}
+                    placeholder="https://client.com"
+                    className="h-12 rounded-[18px] border-amber-900/10 bg-white px-4 text-stone-900 placeholder:text-stone-400 shadow-sm"
+                  />
+                </div>
                 <Button
                   size="lg"
                   className="h-12 rounded-[18px] bg-stone-950 px-6 text-white hover:bg-stone-800 md:min-w-[220px]"
-                  onClick={handleGenerate}
                   disabled={isLoading}
+                  type="submit"
                 >
                   {isLoading ? "Analyzing client..." : "Generate Proposal"}
                   <ArrowUpRightIcon />
@@ -175,6 +182,7 @@ export function ProposalAgent() {
                   {error}
                 </div>
               ) : null}
+              </form>
             </CardContent>
           </Card>
         </section>
