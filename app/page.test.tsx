@@ -7,13 +7,13 @@ describe("HomePage", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: /generate client-winning proposals in seconds/i,
+        name: /proposal agent/i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/client website/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/job description/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/client website url/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /generate proposal/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText(/proposal agent analyzes the client/i)).toBeInTheDocument();
   });
 });
