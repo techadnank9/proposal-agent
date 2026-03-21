@@ -14,6 +14,35 @@ export const generateProposalRequestSchema = z.object({
   url: z.string().trim().min(1, "Client website URL is required."),
 });
 
+export const businessLeadSchema = z.object({
+  name: z.string().trim().min(1),
+  category: z.string().trim().default(""),
+  address: z.string().trim().default(""),
+  phone: z.string().trim().default(""),
+  email: z.string().trim().default(""),
+  website: z.string().trim().default(""),
+  rating: z.number().nullable().optional().default(null),
+  reviewsCount: z.number().int().nonnegative().optional().default(0),
+  sourceUrl: z.string().trim().default(""),
+  locationText: z.string().trim().default(""),
+});
+
+export const discoverBusinessesRequestSchema = z.object({
+  category: z.string().trim().min(1, "Business category is required."),
+  locationText: z.string().trim().min(1, "Location is required."),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+});
+
+export const generateProposalFromLeadRequestSchema = z.object({
+  lead: businessLeadSchema,
+});
+
+export const proposalGenerationRequestSchema = z.union([
+  generateProposalRequestSchema,
+  generateProposalFromLeadRequestSchema,
+]);
+
 export const websiteInsightsSchema = z.object({
   title: z.string().default(""),
   description: z.string().default(""),
@@ -28,4 +57,6 @@ export const websiteInsightsSchema = z.object({
 
 export type Proposal = z.infer<typeof proposalSchema>;
 export type GenerateProposalRequest = z.infer<typeof generateProposalRequestSchema>;
+export type BusinessLead = z.infer<typeof businessLeadSchema>;
+export type DiscoverBusinessesRequest = z.infer<typeof discoverBusinessesRequestSchema>;
 export type WebsiteInsights = z.infer<typeof websiteInsightsSchema>;

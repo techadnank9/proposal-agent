@@ -14,6 +14,9 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("button", { name: /generate proposal/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /discover businesses/i }),
+    ).toHaveAttribute("href", "/discover");
     expect(screen.getByText(/proposal agent analyzes the client/i)).toBeInTheDocument();
   });
 });

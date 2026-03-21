@@ -1,12 +1,14 @@
-import type { Proposal, WebsiteInsights } from "@/lib/types";
+import type { BusinessLead, Proposal, WebsiteInsights } from "@/lib/types";
 
 type PromptInput = {
-  url: string;
+  url?: string;
+  lead?: BusinessLead | null;
   insights?: WebsiteInsights | null;
 };
 
 export function buildProposalPrompt({
   url,
+  lead,
   insights,
 }: PromptInput) {
   const services = insights?.services?.length
@@ -24,9 +26,17 @@ Your task:
 - return valid JSON only
 
 Client website: ${url || "Not provided"}
-Client title: ${insights?.title || "Unknown"}
+Client title: ${insights?.title || lead?.name || "Unknown"}
 Client description: ${insights?.description || "Unknown"}
 Client services: ${services}
+Business name: ${insights?.businessName || lead?.name || "Unknown"}
+Business category: ${lead?.category || "Unknown"}
+Business address: ${insights?.address || lead?.address || "Unknown"}
+Business phone: ${insights?.phone || lead?.phone || "Unknown"}
+Business email: ${insights?.email || lead?.email || "Unknown"}
+Business location context: ${lead?.locationText || "Unknown"}
+Google Maps reviews: ${lead?.reviewsCount || 0}
+Google Maps rating: ${lead?.rating ?? "Unknown"}
 
 Return exactly this JSON shape:
 {

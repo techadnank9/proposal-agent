@@ -1,31 +1,51 @@
 import { buildProposalPrompt } from "@/lib/prompt";
 import { fetchWebsiteInsights } from "@/lib/apify";
+import { buildInsightsFromLead } from "@/lib/discover";
 import { generateProposal } from "@/lib/llm";
-import { generateProposalRequestSchema } from "@/lib/types";
+import {
+  generateProposalFromLeadRequestSchema,
+  generateProposalRequestSchema,
+} from "@/lib/types";
 import { logDebug, logError } from "@/lib/debug";
 
 export async function POST(request: Request) {
   try {
-    const body = generateProposalRequestSchema.parse(await request.json());
+    const rawBody = await request.json();
+    const urlResult = generateProposalRequestSchema.safeParse(rawBody);
+    const leadResult = generateProposalFromLeadRequestSchema.safeParse(rawBody);
+
+    if (!urlResult.success && !leadResult.success) {
+      throw new Error("Provide a client website URL or a discovered business lead.");
+    }
+
+    const url = urlResult.success ? urlResult.data.url : null;
+    const lead = leadResult.success ? leadResult.data.lead : null;
+    const effectiveUrl = url;
 
     logDebug("api/generate", "Request received", {
-      hasUrl: Boolean(body.url),
-      url: body.url || null,
+      hasUrl: Boolean(effectiveUrl || lead?.website),
+      hasLead: Boolean(lead),
+      url: effectiveUrl ?? lead?.website ?? null,
     });
 
-    let insights = null;
-    try {
-      insights = await fetchWebsiteInsights(body.url);
-    } catch {
-      logError("api/generate", "Continuing without website insights", {
-        url: body.url,
-      });
-      insights = null;
+    let insights = lead ? buildInsightsFromLead(lead) : null;
+
+    if (effectiveUrl) {
+      try {
+        const websiteInsights = await fetchWebsiteInsights(effectiveUrl);
+        insights = websiteInsights;
+      } catch {
+        logError("api/generate", "Continuing without website insights", {
+          url: effectiveUrl,
+        });
+        insights = null;
+      }
     }
 
     const prompt = buildProposalPrompt({
-      url: body.url,
-      insights,
+      url: effectiveUrl ?? undefined,
+      lead: lead ?? undefined,
+      insights: insights ?? undefined,
     });
 
     const proposal = await generateProposal(prompt);
