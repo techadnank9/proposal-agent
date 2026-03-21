@@ -69,9 +69,17 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_MODEL=openai/gpt-4o-mini
 OPENROUTER_SITE_URL=http://localhost:3000
 OPENROUTER_APP_NAME=Proposal Agent
+PROPOSAL_AGENT_DEBUG=true
+NEXT_PUBLIC_PROPOSAL_AGENT_DEBUG=true
 ```
 
 The app also still supports `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` for direct OpenAI-style providers.
+
+Logging:
+
+- `PROPOSAL_AGENT_DEBUG=true` keeps server logs visible in local and deployed environments
+- `NEXT_PUBLIC_PROPOSAL_AGENT_DEBUG=true` keeps browser-console logs visible in the deployed app
+- set either one to `false` if you want to silence that side
 
 ## Local Setup
 

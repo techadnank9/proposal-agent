@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { logClientDebug, logClientError } from "@/lib/debug";
 import type { Proposal } from "@/lib/types";
 
 type GenerateResponse = {
@@ -70,9 +71,14 @@ export function ProposalAgent() {
 
   async function handleGenerate() {
     if (!url.trim()) {
+      logClientError("ui/generate", "Blocked empty URL submission");
       setError("Add a client website URL to generate a proposal.");
       return;
     }
+
+    logClientDebug("ui/generate", "Submitting proposal request", {
+      url,
+    });
 
     setIsLoading(true);
     setError("");
@@ -92,6 +98,11 @@ export function ProposalAgent() {
         error?: string;
       };
 
+      logClientDebug("ui/generate", "Received API response", {
+        status: response.status,
+        ok: response.ok,
+      });
+
       if (!response.ok) {
         throw new Error(payload.error || "Failed to generate proposal.");
       }
@@ -99,11 +110,19 @@ export function ProposalAgent() {
       setProposal(payload.proposal);
       setInsights(payload.insights ?? null);
       setIsEditing(false);
+      logClientDebug("ui/generate", "Proposal rendered successfully", {
+        hasInsights: Boolean(payload.insights),
+        problemCount: payload.proposal.problems.length,
+        deliverableCount: payload.proposal.deliverables.length,
+      });
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
           : "Failed to generate proposal.";
+      logClientError("ui/generate", "Proposal generation failed", {
+        message,
+      });
       setError(message);
     } finally {
       setIsLoading(false);
@@ -256,9 +275,19 @@ export function ProposalAgent() {
                           className="rounded-full"
                           size="icon"
                           aria-label="Copy proposal"
-                          onClick={() =>
-                            navigator.clipboard.writeText(buildFinalProposalText(proposal))
-                          }
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(
+                                buildFinalProposalText(proposal),
+                              );
+                              logClientDebug("ui/proposal", "Copied final proposal");
+                            } catch (error) {
+                              logClientError("ui/proposal", "Failed to copy proposal", {
+                                message:
+                                  error instanceof Error ? error.message : String(error),
+                              });
+                            }
+                          }}
                         >
                           <CopyIcon />
                         </Button>
