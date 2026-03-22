@@ -34,6 +34,19 @@ export const discoverBusinessesRequestSchema = z.object({
   longitude: z.number().optional(),
 });
 
+export const discoveryQuotaStateSchema = z.object({
+  freeSearchesUsed: z.number().int().nonnegative().default(0),
+  hasPaidUnlock: z.boolean().default(false),
+});
+
+export const discoverBusinessesResponseSchema = z.object({
+  leads: z.array(businessLeadSchema).default([]),
+  freeSearchesRemaining: z.number().int().nonnegative().default(0),
+  hasPaidUnlock: z.boolean().default(false),
+  requiresPayment: z.boolean().default(false),
+  message: z.string().default(""),
+});
+
 export const generateProposalFromLeadRequestSchema = z.object({
   lead: businessLeadSchema,
 });
@@ -59,4 +72,6 @@ export type Proposal = z.infer<typeof proposalSchema>;
 export type GenerateProposalRequest = z.infer<typeof generateProposalRequestSchema>;
 export type BusinessLead = z.infer<typeof businessLeadSchema>;
 export type DiscoverBusinessesRequest = z.infer<typeof discoverBusinessesRequestSchema>;
+export type DiscoveryQuotaState = z.infer<typeof discoveryQuotaStateSchema>;
+export type DiscoverBusinessesResponse = z.infer<typeof discoverBusinessesResponseSchema>;
 export type WebsiteInsights = z.infer<typeof websiteInsightsSchema>;

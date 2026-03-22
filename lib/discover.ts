@@ -7,6 +7,7 @@ import {
 import { logDebug, logError } from "@/lib/debug";
 
 type GoogleMapsActorItem = Record<string, unknown>;
+type EmailActorItem = Record<string, unknown>;
 
 function normalizeString(value: unknown) {
   if (typeof value === "string") {
@@ -48,6 +49,107 @@ function pickEmail(item: GoogleMapsActorItem) {
   }
 
   return pickString(item, ["Email", "email"]);
+}
+
+function normalizeDomain(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return value
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0]
+      .trim()
+      .toLowerCase();
+  }
+}
+
+function flattenEmailItems(payload: unknown): EmailActorItem[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.flatMap((entry) => {
+    if (Array.isArray(entry)) {
+      return flattenEmailItems(entry);
+    }
+
+    return entry && typeof entry === "object" ? [entry as EmailActorItem] : [];
+  });
+}
+
+function normalizeEmailResults(payload: unknown) {
+  const items = flattenEmailItems(payload);
+  const emailsByDomain = new Map<string, string>();
+
+  for (const item of items) {
+    const domain = normalizeDomain(pickString(item, ["domain", "Domain"]));
+    const email = pickString(item, ["email", "Email"]);
+
+    if (domain && email && !emailsByDomain.has(domain)) {
+      emailsByDomain.set(domain, email);
+    }
+  }
+
+  return emailsByDomain;
+}
+
+async function fetchEmailsForDomains(
+  domains: string[],
+  fetchImpl: typeof fetch = fetch,
+) {
+  if (!domains.length) {
+    return new Map<string, string>();
+  }
+
+  const token = process.env.APIFY_API_TOKEN;
+  if (!token) {
+    throw new Error("Missing APIFY_API_TOKEN.");
+  }
+
+  const actorId =
+    process.env.APIFY_EMAIL_ACTOR_ID ?? "s-r~free-email-domain-scraper";
+
+  logDebug("discover", "Starting email enrichment", {
+    actorId,
+    domainCount: domains.length,
+  });
+
+  const response = await fetchImpl(
+    `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        domains,
+        max_emails_per_domain: 1,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logError("discover", "Email enrichment request failed", {
+      status: response.status,
+      body: errorText,
+    });
+    throw new Error(errorText || "Failed to enrich lead emails.");
+  }
+
+  const payload = await response.json();
+  const emailsByDomain = normalizeEmailResults(payload);
+
+  logDebug("discover", "Email enrichment completed", {
+    enrichedDomainCount: emailsByDomain.size,
+  });
+
+  return emailsByDomain;
 }
 
 export function normalizeGoogleMapsLead(
@@ -117,6 +219,30 @@ export async function fetchGoogleMapsLeads(
   const leads = payload
     .map((item) => normalizeGoogleMapsLead(item, category, locationText))
     .filter((lead) => lead.name);
+
+  const missingEmailDomains = Array.from(
+    new Set(
+      leads
+        .filter((lead) => !lead.email && lead.website)
+        .map((lead) => normalizeDomain(lead.website))
+        .filter(Boolean),
+    ),
+  );
+
+  if (missingEmailDomains.length > 0) {
+    try {
+      const emailsByDomain = await fetchEmailsForDomains(missingEmailDomains, fetchImpl);
+
+      for (const lead of leads) {
+        const domain = normalizeDomain(lead.website);
+        if (!lead.email && domain && emailsByDomain.has(domain)) {
+          lead.email = emailsByDomain.get(domain) ?? "";
+        }
+      }
+    } catch {
+      logError("discover", "Continuing without email enrichment");
+    }
+  }
 
   logDebug("discover", "Google Maps lead search completed", {
     leadCount: leads.length,

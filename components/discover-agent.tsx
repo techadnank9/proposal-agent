@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   MapPinIcon,
   SearchIcon,
@@ -19,7 +20,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { logClientDebug, logClientError } from "@/lib/debug";
-import type { BusinessLead, Proposal, WebsiteInsights } from "@/lib/types";
+import type {
+  BusinessLead,
+  DiscoverBusinessesResponse,
+  Proposal,
+  WebsiteInsights,
+} from "@/lib/types";
 
 const CATEGORY_PRESETS = [
   "Restaurants",
@@ -66,17 +72,24 @@ type GenerateResponse = {
 };
 
 export function DiscoverAgent() {
+  const searchParams = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState("Restaurants");
   const [locationText, setLocationText] = useState(DEFAULT_LOCATION);
   const [locationStatus, setLocationStatus] = useState(DEFAULT_LOCATION);
   const [searchError, setSearchError] = useState("");
   const [generateError, setGenerateError] = useState("");
+  const [billingError, setBillingError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [activeLeadKey, setActiveLeadKey] = useState<string | null>(null);
   const [leads, setLeads] = useState<BusinessLead[]>([]);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [insights, setInsights] = useState<WebsiteInsights | null>(null);
+  const [freeSearchesRemaining, setFreeSearchesRemaining] = useState<number>(3);
+  const [hasPaidUnlock, setHasPaidUnlock] = useState(false);
+  const [requiresPayment, setRequiresPayment] = useState(false);
+  const [billingMessage, setBillingMessage] = useState("");
 
   const effectiveCategory = useMemo(() => selectedCategory, [selectedCategory]);
 
@@ -114,6 +127,35 @@ export function DiscoverAgent() {
     );
   }, []);
 
+  useEffect(() => {
+    async function loadQuota() {
+      try {
+        const response = await fetch("/api/discover", { method: "GET" });
+        const payload = (await response.json()) as DiscoverBusinessesResponse;
+        setFreeSearchesRemaining(payload.freeSearchesRemaining);
+        setHasPaidUnlock(payload.hasPaidUnlock);
+      } catch {
+        // Keep defaults for demo resiliency.
+      }
+    }
+
+    void loadQuota();
+  }, []);
+
+  useEffect(() => {
+    const billingStatus = searchParams?.get("billing");
+
+    if (billingStatus === "success") {
+      setHasPaidUnlock(true);
+      setRequiresPayment(false);
+      setBillingMessage("Access unlocked for this browser. You can keep searching.");
+    } else if (billingStatus === "cancelled") {
+      setBillingMessage("Checkout cancelled. Your 3 free searches are still available.");
+    } else if (billingStatus === "invalid") {
+      setBillingError("We could not verify the payment session.");
+    }
+  }, [searchParams]);
+
   async function handleSearch() {
     if (!effectiveCategory.trim() || !locationText.trim()) {
       setSearchError("Choose a category and location to search nearby businesses.");
@@ -127,6 +169,7 @@ export function DiscoverAgent() {
 
     setSearchError("");
     setGenerateError("");
+    setBillingError("");
     setProposal(null);
     setInsights(null);
     setIsSearching(true);
@@ -141,16 +184,26 @@ export function DiscoverAgent() {
         }),
       });
 
-      const payload = (await response.json()) as {
-        leads?: BusinessLead[];
+      const payload = (await response.json()) as DiscoverBusinessesResponse & {
         error?: string;
       };
+
+      setFreeSearchesRemaining(payload.freeSearchesRemaining);
+      setHasPaidUnlock(payload.hasPaidUnlock);
+      setRequiresPayment(payload.requiresPayment);
+      setBillingMessage(payload.message || "");
+
+      if (response.status === 402 || payload.requiresPayment) {
+        setLeads([]);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(payload.error || "Failed to discover businesses.");
       }
 
       setLeads(payload.leads ?? []);
+      setRequiresPayment(false);
       if (!payload.leads?.length) {
         setSearchError("No businesses found for this category and location.");
       }
@@ -162,6 +215,31 @@ export function DiscoverAgent() {
       setLeads([]);
     } finally {
       setIsSearching(false);
+    }
+  }
+
+  async function handleBuyAccess() {
+    setBillingError("");
+    setIsStartingCheckout(true);
+
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+      });
+
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Failed to start checkout.");
+      }
+
+      window.location.assign(payload.url);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to start checkout.";
+      logClientError("ui/discover", "Checkout start failed", { message });
+      setBillingError(message);
+    } finally {
+      setIsStartingCheckout(false);
     }
   }
 
@@ -245,19 +323,60 @@ export function DiscoverAgent() {
                 <MapPinIcon className="size-5" />
                 <span>{locationText || locationStatus || DEFAULT_LOCATION}</span>
               </div>
-              <Button
-                type="button"
-                className="h-14 rounded-full bg-stone-950 px-8 text-lg text-white hover:bg-stone-800"
-                onClick={handleSearch}
-                disabled={isSearching || !locationText.trim()}
-              >
-                {isSearching ? "Searching..." : "Search businesses"}
-                <SearchIcon />
-              </Button>
+              <div className="flex flex-col items-start gap-2 md:items-end">
+                <p className="text-sm text-stone-600">
+                  {hasPaidUnlock
+                    ? "Unlimited searches unlocked in this browser."
+                    : `${freeSearchesRemaining} free searches remaining`}
+                </p>
+                <Button
+                  type="button"
+                  className="h-14 rounded-full bg-stone-950 px-8 text-lg text-white hover:bg-stone-800"
+                  onClick={handleSearch}
+                  disabled={isSearching || !locationText.trim()}
+                >
+                  {isSearching ? "Searching..." : "Search businesses"}
+                  <SearchIcon />
+                </Button>
+              </div>
             </div>
+            {requiresPayment ? (
+              <Card className="rounded-[26px] border border-amber-900/10 bg-amber-50/70 shadow-none">
+                <CardContent className="flex flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-stone-950">
+                      3 free searches used
+                    </p>
+                    <p className="text-sm leading-6 text-stone-700">
+                      {billingMessage ||
+                        "Buy access to unlock unlimited discovery searches in this browser."}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="rounded-full bg-stone-950 px-6 text-white hover:bg-stone-800"
+                    onClick={handleBuyAccess}
+                    disabled={isStartingCheckout}
+                  >
+                    {isStartingCheckout ? "Opening checkout..." : "Buy access"}
+                    <SparklesIcon />
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
             {searchError ? (
               <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {searchError}
+              </div>
+            ) : null}
+            {billingError ? (
+              <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {billingError}
+              </div>
+            ) : null}
+            {billingMessage && !requiresPayment ? (
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {billingMessage}
               </div>
             ) : null}
           </CardHeader>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CopyIcon, PencilIcon } from "lucide-react";
+import { CopyIcon, MailIcon, PencilIcon } from "lucide-react";
 
 import { ProposalEditor } from "@/components/proposal-editor";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { logClientDebug, logClientError } from "@/lib/debug";
+import { cn } from "@/lib/utils";
 import type { Proposal, WebsiteInsights } from "@/lib/types";
 
 type ProposalResultsProps = {
@@ -48,6 +50,14 @@ export function ProposalResults({
       `Pricing: ${currentProposal.pricing}`,
     ].join("\n");
   }
+
+  const businessName = insights?.businessName || insights?.title || "your business";
+  const proposalText = buildFinalProposalText(proposal);
+  const mailtoHref = insights?.email
+    ? `mailto:${encodeURIComponent(insights.email)}?subject=${encodeURIComponent(
+        `Proposal for ${businessName}`,
+      )}&body=${encodeURIComponent(proposalText)}`
+    : null;
 
   return (
     <div className="grid gap-5">
@@ -111,6 +121,16 @@ export function ProposalResults({
                 Proposal
               </div>
               <div className="flex items-center gap-2">
+                {mailtoHref ? (
+                  <a
+                    href={mailtoHref}
+                    aria-label="Send proposal by email"
+                    className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
+                  >
+                      <MailIcon />
+                      Email
+                  </a>
+                ) : null}
                 <Button
                   className="rounded-full"
                   size="icon"

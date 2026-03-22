@@ -142,6 +142,15 @@ export function ProposalAgent() {
                 <ArrowUpRightIcon className="size-4" />
               </span>
             </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex h-11 items-center rounded-full border border-amber-900/10 bg-white/85 px-5 text-stone-900 shadow-sm transition-colors hover:bg-white"
+            >
+              <span className="inline-flex items-center gap-2">
+                Pricing
+                <ArrowUpRightIcon className="size-4" />
+              </span>
+            </Link>
           </div>
         </section>
 

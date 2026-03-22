@@ -33,6 +33,16 @@ describe("DiscoverAgent", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          leads: [],
+          freeSearchesRemaining: 3,
+          hasPaidUnlock: false,
+          requiresPayment: false,
+          message: "",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
           address: {
             city: "San Francisco",
             state: "California",
@@ -122,6 +132,79 @@ describe("DiscoverAgent", () => {
 
     expect(screen.getByText(/ciao@zingari.com/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy proposal/i })).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the paywall after quota exhaustion", async () => {
+    const user = userEvent.setup();
+
+    Object.defineProperty(window.navigator, "geolocation", {
+      value: {
+        getCurrentPosition: vi.fn((success: PositionCallback) =>
+          success({
+            coords: {
+              latitude: 37.7749,
+              longitude: -122.4194,
+              accuracy: 1,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+              toJSON: () => ({}),
+            },
+            timestamp: Date.now(),
+            toJSON: () => ({}),
+          } as GeolocationPosition),
+        ),
+      },
+      configurable: true,
+    });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          leads: [],
+          freeSearchesRemaining: 0,
+          hasPaidUnlock: false,
+          requiresPayment: false,
+          message: "",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          address: {
+            city: "San Francisco",
+            state: "California",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 402,
+        json: async () => ({
+          leads: [],
+          freeSearchesRemaining: 0,
+          hasPaidUnlock: false,
+          requiresPayment: true,
+          message: "You have used your 3 free searches. Buy access to continue.",
+        }),
+      });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DiscoverAgent />);
+
+    await user.click(screen.getByRole("button", { name: /search businesses/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/3 free searches used/i)).toBeInTheDocument(),
+    );
+
+    expect(screen.getByRole("button", { name: /buy access/i })).toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });

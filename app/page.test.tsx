@@ -17,6 +17,10 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("link", { name: /discover businesses/i }),
     ).toHaveAttribute("href", "/discover");
+    expect(screen.getByRole("link", { name: /^pricing$/i })).toHaveAttribute(
+      "href",
+      "/pricing",
+    );
     expect(screen.getByText(/proposal agent analyzes the client/i)).toBeInTheDocument();
   });
 });
